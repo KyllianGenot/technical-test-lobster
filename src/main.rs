@@ -4,6 +4,9 @@ use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use std::path::Path;
 
+mod schema;
+mod models;
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct Settings {
