@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use tokio::task;
-use crate::models::transfer::Transfer;
+use crate::models::transfer::{Transfer, NewTransfer};
 use crate::schema::transfers;
 
 #[derive(Debug)]
@@ -14,11 +14,12 @@ impl TransferRepo {
         TransferRepo { pool }
     }
 
-    pub async fn insert_transfer(&self, transfer: Transfer) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn insert_transfer(&self, transfer: NewTransfer) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.pool.get()?;
         task::spawn_blocking(move || {
             diesel::insert_into(transfers::table)
                 .values(&transfer)
+                .on_conflict_do_nothing()
                 .execute(&mut conn)
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
             Ok(())
