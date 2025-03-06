@@ -14,14 +14,13 @@ impl TransferRepo {
         TransferRepo { pool }
     }
 
-    // Change &Transfer to Transfer to take ownership
     pub async fn insert_transfer(&self, transfer: Transfer) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut conn = self.pool.get()?; // Declare as mutable
+        let mut conn = self.pool.get()?;
         task::spawn_blocking(move || {
             diesel::insert_into(transfers::table)
-                .values(&transfer) // Use reference here since Diesel expects Insertable
-                .execute(&mut conn) // Use mutable connection
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?; // Map Diesel error
+                .values(&transfer)
+                .execute(&mut conn)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
             Ok(())
         })
         .await?
@@ -32,7 +31,7 @@ impl TransferRepo {
         sender: Option<String>,
         recipient: Option<String>,
     ) -> Result<Vec<Transfer>, Box<dyn std::error::Error + Send + Sync>> {
-        let mut conn = self.pool.get()?; // Declare as mutable
+        let mut conn = self.pool.get()?;
         let sender = sender.clone();
         let recipient = recipient.clone();
         task::spawn_blocking(move || {
@@ -44,8 +43,8 @@ impl TransferRepo {
                 query = query.filter(transfers::recipient.eq(r));
             }
             query
-                .load::<Transfer>(&mut conn) // Use mutable connection
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>) // Map Diesel error
+                .load::<Transfer>(&mut conn)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
         })
         .await?
     }

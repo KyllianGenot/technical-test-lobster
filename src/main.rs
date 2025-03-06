@@ -4,11 +4,14 @@ use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use std::path::Path;
 use crate::utils::eth::connect_to_node;
+use crate::services::indexer::start_indexing;
+use env_logger; // For logging
 
 mod schema;
 mod models;
 mod repositories;
 mod utils;
+mod services;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -71,6 +74,8 @@ fn create_db_pool(database_url: &str) -> Result<DbPool, diesel::r2d2::Error> {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init(); // Initialize logging
+
     let settings = match load_config() {
         Ok(config) => config,
         Err(e) => {
@@ -90,14 +95,20 @@ async fn main() {
     };
     println!("Database pool initialized successfully: {:?}", pool);
 
-    let transfer_repo = repositories::transfer_repo::TransferRepo::new(pool);
+    let transfer_repo = repositories::transfer_repo::TransferRepo::new(pool.clone());
     println!("TransferRepo initialized: {:?}", transfer_repo);
 
-    // Test Ethereum connection
     match connect_to_node(&settings.ethereum.node_url).await {
         Ok(web3) => println!("Connected to Ethereum node: {:?}", web3.eth().chain_id().await),
         Err(e) => println!("Failed to connect to Ethereum node: {}", e),
     }
 
-    println!("Test complete. Config loading works!");
+    tokio::spawn(start_indexing(
+        pool,
+        settings.ethereum.node_url.clone(),
+        settings.ethereum.token_address.clone(),
+    ));
+
+    println!("Indexer started. Running indefinitely...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
 }

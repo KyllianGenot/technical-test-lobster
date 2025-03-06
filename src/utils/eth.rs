@@ -3,7 +3,6 @@ use web3::Web3;
 use web3::transports::Http;
 use web3::Error;
 
-// Add this line
 use hex;
 
 pub async fn connect_to_node(node_url: &str) -> Result<Web3<Http>, Error> {
