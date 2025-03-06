@@ -5,6 +5,8 @@ use diesel::r2d2::ConnectionManager;
 use std::path::Path;
 use crate::utils::eth::connect_to_node;
 use crate::services::indexer::start_indexing;
+use crate::api::eth_scope;
+use actix_web::{App, HttpServer, web};
 use env_logger;
 use log::{error, info};
 
@@ -13,6 +15,7 @@ mod models;
 mod repositories;
 mod utils;
 mod services;
+mod api;
 
 #[derive(Debug, Deserialize)]
 struct Settings {
@@ -67,7 +70,7 @@ fn create_db_pool(database_url: &str) -> Result<DbPool, diesel::r2d2::Error> {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let settings = load_config().unwrap_or_else(|e| {
@@ -90,16 +93,27 @@ async fn main() {
         Err(e) => eprintln!("Failed to connect to Ethereum node: {}", e),
     }
 
+    let indexer_pool = pool.clone();
+    let indexer_node_url = settings.ethereum.node_url.clone();
+    let indexer_token_address = settings.ethereum.token_address.clone();
     tokio::spawn(async move {
         if let Err(e) = start_indexing(
-            pool,
-            settings.ethereum.node_url.clone(),
-            settings.ethereum.token_address.clone(),
+            indexer_pool,
+            indexer_node_url,
+            indexer_token_address,
         ).await {
             error!("Indexer failed: {}", e);
         }
     });
 
-    info!("Indexer started. Running indefinitely...");
-    tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+    let api_port = settings.api.port;
+    info!("Starting API server on port {}", api_port);
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(pool.clone()))
+            .service(eth_scope())
+    })
+    .bind(("127.0.0.1", api_port))?
+    .run()
+    .await
 }

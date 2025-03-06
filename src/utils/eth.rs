@@ -24,8 +24,10 @@ pub fn decode_transfer_log(log: Log) -> Result<(String, String, String), String>
         return Err("Log missing required topics or data".to_string());
     }
 
-    let sender = H160::from(log.topics[1]).to_string();
-    let recipient = H160::from(log.topics[2]).to_string();
+    let sender_bytes = log.topics[1].as_bytes();
+    let recipient_bytes = log.topics[2].as_bytes();
+    let sender = format!("0x{}", hex::encode(&sender_bytes[12..]));
+    let recipient = format!("0x{}", hex::encode(&recipient_bytes[12..]));
     let amount = U256::from_big_endian(&log.data.0).to_string();
 
     Ok((sender, recipient, amount))
