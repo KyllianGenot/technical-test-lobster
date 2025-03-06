@@ -6,6 +6,7 @@ use std::path::Path;
 
 mod schema;
 mod models;
+mod repositories;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -66,8 +67,8 @@ fn create_db_pool(database_url: &str) -> Result<DbPool, diesel::r2d2::Error> {
         ))
 }
 
-fn main() {
-    // Load configuration
+#[tokio::main]
+async fn main() {
     let settings = match load_config() {
         Ok(config) => config,
         Err(e) => {
@@ -78,10 +79,17 @@ fn main() {
 
     println!("Loaded configuration: {:?}", settings);
 
-    match create_db_pool(&settings.database.url) {
-        Ok(pool) => println!("Database pool initialized successfully: {:?}", pool),
-        Err(e) => println!("Database pool failed (expected without a real DB): {}", e),
+    let pool = match create_db_pool(&settings.database.url) {
+        Ok(pool) => pool,
+        Err(e) => {
+            println!("Database pool failed: {}", e);
+            std::process::exit(1);
+        }
     };
+    println!("Database pool initialized successfully: {:?}", pool);
+
+    let transfer_repo = repositories::transfer_repo::TransferRepo::new(pool);
+    println!("TransferRepo initialized: {:?}", transfer_repo);
 
     println!("Test complete. Config loading works!");
 }
