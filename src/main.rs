@@ -3,10 +3,12 @@ use serde::Deserialize;
 use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use std::path::Path;
+use crate::utils::eth::connect_to_node;
 
 mod schema;
 mod models;
 mod repositories;
+mod utils;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -90,6 +92,12 @@ async fn main() {
 
     let transfer_repo = repositories::transfer_repo::TransferRepo::new(pool);
     println!("TransferRepo initialized: {:?}", transfer_repo);
+
+    // Test Ethereum connection
+    match connect_to_node(&settings.ethereum.node_url).await {
+        Ok(web3) => println!("Connected to Ethereum node: {:?}", web3.eth().chain_id().await),
+        Err(e) => println!("Failed to connect to Ethereum node: {}", e),
+    }
 
     println!("Test complete. Config loading works!");
 }
