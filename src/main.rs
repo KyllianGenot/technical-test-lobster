@@ -3,10 +3,12 @@ use serde::Deserialize;
 use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use std::path::Path;
-use crate::utils::eth::connect_to_node;
 use crate::services::indexer::start_indexing;
 use crate::api::eth_scope;
+use crate::utils::eth::connect_to_node;
 use actix_web::{App, HttpServer, web};
+use actix_cors::Cors;
+use actix_files::Files;
 use env_logger;
 use log::{error, info};
 
@@ -72,6 +74,7 @@ fn create_db_pool(database_url: &str) -> Result<DbPool, diesel::r2d2::Error> {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
+    info!("Starting Step 11: Main Application");
 
     let settings = load_config().unwrap_or_else(|e| {
         eprintln!("Failed to load configuration: {}", e);
@@ -109,9 +112,11 @@ async fn main() -> std::io::Result<()> {
     let api_port = settings.api.port;
     info!("Starting API server on port {}", api_port);
     HttpServer::new(move || {
-        App::new()
+        let app = App::new()
+            .wrap(Cors::permissive())
             .app_data(web::Data::new(pool.clone()))
-            .service(eth_scope())
+            .service(eth_scope());
+        app.service(Files::new("/", "frontend/dist").index_file("index.html"))
     })
     .bind(("127.0.0.1", api_port))?
     .run()

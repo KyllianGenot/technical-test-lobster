@@ -1,11 +1,12 @@
+use web3::types::{H256, FilterBuilder, BlockNumber, H160, U64};
 use diesel::r2d2::ConnectionManager;
 use diesel::pg::PgConnection;
 use tokio::time::{interval, Duration};
-use web3::types::{FilterBuilder, H256, U64, BlockNumber, H160};
 use crate::repositories::transfer_repo::TransferRepo;
 use crate::utils::eth::{connect_to_node, decode_transfer_log};
 use crate::models::transfer::NewTransfer;
 use log::{info, error};
+use hex;
 
 async fn backfill_transfers(
     pool: diesel::r2d2::Pool<ConnectionManager<PgConnection>>,
@@ -50,7 +51,7 @@ async fn backfill_transfers(
                         recipient,
                         amount,
                         block_number: log.block_number.unwrap_or_default().as_u64() as i64,
-                        tx_hash: format!("{:x}", log.transaction_hash.unwrap_or_default()),
+                        tx_hash: format!("0x{:x}", log.transaction_hash.unwrap_or_default()),
                     };
                     if let Err(e) = transfer_repo.insert_transfer(transfer).await {
                         error!("Failed to insert historical transfer: {}", e);
@@ -152,7 +153,7 @@ pub async fn start_indexing(
                             recipient,
                             amount,
                             block_number: log.block_number.unwrap_or_default().as_u64() as i64,
-                            tx_hash: format!("{:x}", log.transaction_hash.unwrap_or_default()),
+                            tx_hash: format!("0x{:x}", log.transaction_hash.unwrap_or_default()),
                         };
                         if let Err(e) = transfer_repo.insert_transfer(transfer).await {
                             error!("Failed to insert transfer: {}", e);

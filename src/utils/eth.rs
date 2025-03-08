@@ -1,8 +1,7 @@
-use web3::types::{Log, H160, H256, U256};
+use web3::types::{Log, H256, U256};
 use web3::Web3;
 use web3::transports::Http;
 use web3::Error;
-
 use hex;
 
 pub async fn connect_to_node(node_url: &str) -> Result<Web3<Http>, Error> {
