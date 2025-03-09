@@ -4,5 +4,5 @@ CREATE TABLE transfers (
     recipient TEXT NOT NULL,
     amount TEXT NOT NULL,
     block_number BIGINT NOT NULL,
-    tx_hash TEXT NOT NULL
+    tx_hash TEXT NOT NULL UNIQUE
 );
