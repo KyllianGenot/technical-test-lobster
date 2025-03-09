@@ -29,14 +29,14 @@ async fn get_transfers(
     query: web::Query<TransferQuery>,
     pool: web::Data<diesel::r2d2::Pool<ConnectionManager<PgConnection>>>,
 ) -> impl Responder {
-    let transfer_repo = TransferRepo::new(pool.as_ref().clone()); // Correction ici
+    let transfer_repo = TransferRepo::new(pool.as_ref().clone());
     
     match transfer_repo.get_transfers(query.sender.clone(), query.recipient.clone()).await {
         Ok(transfers) => {
             let response = TransferResponse {
                 token: TokenInfo {
                     decimals: 18,
-                    symbol: "DEMO".to_string(),
+                    symbol: "LOB".to_string(),
                 },
                 transfers,
             };

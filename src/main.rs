@@ -32,7 +32,7 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
     
     env_logger::init();
-    info!("Starting Step 11: Main Application");
+    info!("Starting Main Application");
 
     let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in .env file");
