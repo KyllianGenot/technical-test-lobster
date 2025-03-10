@@ -61,12 +61,12 @@ show_info() {
 # Section header with dynamic centering
 show_section() {
     local title=$1
-    local width=60
+    local width=68
     local padding=$(( (width - ${#title}) / 2 ))
     local left_padding=$(printf "%${padding}s" "")
-    echo -e "\n${WHITE}────────────────────────────────────────────────────────────${RESET}"
+    echo -e "\n${WHITE}────────────────────────────────────────────────────────────────────${RESET}"
     echo -e "${WHITE}${left_padding}${title}${left_padding// / }${RESET}"
-    echo -e "${WHITE}────────────────────────────────────────────────────────────${RESET}\n"
+    echo -e "${WHITE}────────────────────────────────────────────────────────────────────${RESET}\n"
 }
 
 # Centered welcome message with ASCII art
@@ -85,6 +85,20 @@ show_welcome() {
     echo -e "${WHITE}║                                                                  ║${RESET}"
     echo -e "${WHITE}╚══════════════════════════════════════════════════════════════════╝${RESET}"
     echo -e "\nThis script will set up everything you need to run the application.\n"
+}
+
+# Function to ensure sudo privileges are available
+ensure_sudo() {
+    echo -e "${PRIMARY}${ARROW} This script requires sudo privileges${RESET}"
+    if ! sudo -n true 2>/dev/null; then
+        echo -e "${WARN}${ARROW} Please enter your sudo password:${RESET}"
+        sudo -v || show_error "Failed to obtain sudo privileges"
+    fi
+    # Keep sudo alive during script execution
+    (while true; do sudo -n true; sleep 60; done) &
+    local sudo_pid=$!
+    trap "kill $sudo_pid 2>/dev/null; exit" EXIT INT TERM
+    show_success "Sudo privileges confirmed"
 }
 
 # Function to check if a command exists
@@ -133,8 +147,9 @@ stop_processes() {
     show_success "Stopping any running instances"
 }
 
-# Display welcome message
+# Display welcome message and ensure sudo
 show_welcome
+ensure_sudo
 
 # 1. Install Prerequisites
 show_section "DEVELOPMENT ENVIRONMENT SETUP"
