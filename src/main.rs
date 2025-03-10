@@ -10,6 +10,7 @@ use actix_cors::Cors;
 use actix_files::Files;
 use env_logger;
 use log::{error, info};
+use tokio::sync::broadcast;
 
 mod schema;
 mod models;
@@ -67,21 +68,26 @@ async fn main() -> std::io::Result<()> {
         Err(e) => eprintln!("Failed to connect to Ethereum node: {}", e),
     }
 
+    let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+    let indexer_shutdown_rx = shutdown_rx;
     let indexer_pool = pool.clone();
     let indexer_node_url = ethereum_node_url.clone();
     let indexer_token_address = ethereum_token_address.clone();
+
     tokio::spawn(async move {
         if let Err(e) = start_indexing(
             indexer_pool,
             indexer_node_url,
             indexer_token_address,
+            indexer_shutdown_rx,
         ).await {
             error!("Indexer failed: {}", e);
         }
     });
 
     info!("Starting API server on port {}", api_port);
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let app = App::new()
             .wrap(Cors::permissive())
             .app_data(web::Data::new(pool.clone()))
@@ -89,6 +95,11 @@ async fn main() -> std::io::Result<()> {
         app.service(Files::new("/", "frontend/dist").index_file("index.html"))
     })
     .bind(("127.0.0.1", api_port))?
-    .run()
-    .await
+    .run();
+
+    let result = server.await;
+
+    let _ = shutdown_tx.send(());
+
+    result
 }
