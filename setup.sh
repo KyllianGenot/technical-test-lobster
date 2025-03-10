@@ -106,6 +106,55 @@ else
     exit 1
 fi
 
+# Install pkg-config and libssl-dev for OpenSSL support
+echo -e "${GREEN}Installing OpenSSL development tools and libraries...${NC}"
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if ! command_exists pkg-config; then
+        if sudo apt install -y pkg-config; then
+            echo -e "${GREEN}pkg-config installed successfully with apt.${NC}"
+        else
+            echo -e "${RED}Failed to install pkg-config with apt.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}pkg-config is already installed.${NC}"
+    fi
+    if ! dpkg -l | grep -q libssl-dev; then
+        if sudo apt install -y libssl-dev; then
+            echo -e "${GREEN}libssl-dev installed successfully with apt.${NC}"
+        else
+            echo -e "${RED}Failed to install libssl-dev with apt.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}libssl-dev is already installed.${NC}"
+    fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    if ! brew list pkg-config >/dev/null 2>&1; then
+        if brew install pkg-config; then
+            echo -e "${GREEN}pkg-config installed successfully with Homebrew.${NC}"
+        else
+            echo -e "${RED}Failed to install pkg-config with Homebrew.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}pkg-config is already installed.${NC}"
+    fi
+    if ! brew list openssl >/dev/null 2>&1; then
+        if brew install openssl; then
+            echo -e "${GREEN}openssl installed successfully with Homebrew.${NC}"
+        else
+            echo -e "${RED}Failed to install openssl with Homebrew.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}openssl is already installed.${NC}"
+    fi
+else
+    echo -e "${RED}Unsupported OS. Please install pkg-config and OpenSSL development libraries manually.${NC}"
+    exit 1
+fi
+
 # Start PostgreSQL and ensure it's running
 echo -e "${GREEN}Starting PostgreSQL service...${NC}"
 if [[ "$OSTYPE" == "darwin"* ]]; then
