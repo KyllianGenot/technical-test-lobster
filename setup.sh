@@ -6,8 +6,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Exit on error
-set -e
+# Do NOT exit on error for now (we'll handle errors manually)
+# set -e
 
 # Function to check if a command exists
 command_exists() {
@@ -20,10 +20,23 @@ install_package() {
     if ! command_exists "$package"; then
         echo -e "${GREEN}Installing $package...${NC}"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            brew install "$package" 2>/dev/null || { echo -e "${RED}Failed to install $package with Homebrew.${NC}"; exit 1; }
+            if brew install "$package"; then
+                echo -e "${GREEN}$package installed successfully with Homebrew.${NC}"
+            else
+                echo -e "${RED}Failed to install $package with Homebrew.${NC}"
+                exit 1
+            fi
         elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            if ! command_exists apt; then echo -e "${RED}apt not found, please install $package manually.${NC}"; exit 1; fi
-            sudo apt update >/dev/null 2>&1 && sudo apt install -y "$package" >/dev/null 2>&1 || { echo -e "${RED}Failed to install $package with apt.${NC}"; exit 1; }
+            if ! command_exists apt; then
+                echo -e "${RED}apt not found, please install $package manually.${NC}"
+                exit 1
+            fi
+            if sudo apt update && sudo apt install -y "$package"; then
+                echo -e "${GREEN}$package installed successfully with apt.${NC}"
+            else
+                echo -e "${RED}Failed to install $package with apt.${NC}"
+                exit 1
+            fi
         else
             echo -e "${RED}Unsupported OS. Please install $package manually.${NC}"
             exit 1
@@ -49,8 +62,13 @@ echo -e "${GREEN}Checking and installing prerequisites...${NC}"
 # Rust
 if ! command_exists rustc || ! command_exists cargo; then
     echo -e "${GREEN}Installing Rust...${NC}"
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y >/dev/null 2>&1
-    source "$HOME/.cargo/env" || { echo -e "${RED}Failed to source Rust environment.${NC}"; exit 1; }
+    if curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; then
+        echo -e "${GREEN}Rust installed successfully.${NC}"
+        source "$HOME/.cargo/env" || { echo -e "${RED}Failed to source Rust environment.${NC}"; exit 1; }
+    else
+        echo -e "${RED}Failed to install Rust.${NC}"
+        exit 1
+    fi
 fi
 
 # PostgreSQL
@@ -65,28 +83,47 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     if brew services list | grep -q "postgresql.*started"; then
         echo -e "${GREEN}PostgreSQL is already running.${NC}"
     else
-        brew services start postgresql >/dev/null 2>&1 || { echo -e "${RED}Failed to start PostgreSQL with brew services.${NC}"; exit 1; }
-        sleep 3
-        if ! brew services list | grep -q "postgresql.*started"; then
-            echo -e "${RED}PostgreSQL failed to start. Please check your installation.${NC}"
+        if brew services start postgresql; then
+            sleep 3
+            if brew services list | grep -q "postgresql.*started"; then
+                echo -e "${GREEN}PostgreSQL started successfully.${NC}"
+            else
+                echo -e "${RED}PostgreSQL failed to start. Please check your installation.${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${RED}Failed to start PostgreSQL with brew services.${NC}"
             exit 1
         fi
-        echo -e "${GREEN}PostgreSQL started successfully.${NC}"
     fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if sudo service postgresql status >/dev/null 2>&1; then
         echo -e "${GREEN}PostgreSQL is already running.${NC}"
     else
-        sudo service postgresql start >/dev/null 2>&1 || { echo -e "${RED}Failed to start PostgreSQL with service command.${NC}"; exit 1; }
-        sleep 3
-        if ! sudo service postgresql status >/dev/null 2>&1; then
-            echo -e "${RED}PostgreSQL failed to start. Please check your installation or run 'sudo service postgresql start' manually.${NC}"
+        if sudo service postgresql start; then
+            sleep 3
+            if sudo service postgresql status >/dev/null 2>&1; then
+                echo -e "${GREEN}PostgreSQL started successfully.${NC}"
+            else
+                echo -e "${RED}PostgreSQL failed to start. Please check your installation or run 'sudo service postgresql start' manually.${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${RED}Failed to start PostgreSQL with service command.${NC}"
             exit 1
         fi
-        echo -e "${GREEN}PostgreSQL started successfully.${NC}"
     fi
 else
     echo -e "${RED}Unsupported OS for PostgreSQL startup. Please start PostgreSQL manually.${NC}"
+    exit 1
+fi
+
+# Additional debug: Check PostgreSQL version and user
+echo -e "${GREEN}Debug: Checking PostgreSQL version...${NC}"
+if psql --version; then
+    echo -e "${GREEN}PostgreSQL version check successful.${NC}"
+else
+    echo -e "${RED}Failed to run 'psql --version'. PostgreSQL may not be installed correctly.${NC}"
     exit 1
 fi
 
@@ -102,7 +139,12 @@ fi
 
 # Diesel CLI
 if ! command_exists diesel; then
-    cargo install diesel_cli --no-default-features --features postgres >/dev/null 2>&1
+    if cargo install diesel_cli --no-default-features --features postgres; then
+        echo -e "${GREEN}Diesel CLI installed successfully.${NC}"
+    else
+        echo -e "${RED}Failed to install Diesel CLI.${NC}"
+        exit 1
+    fi
 fi
 
 # Verify all tools
@@ -121,12 +163,27 @@ read -p "Enter PostgreSQL password [press Enter if none]: " PG_PASS
 read -p "Enter database name [default: lobster_db]: " DB_NAME
 DB_NAME=${DB_NAME:-lobster_db}
 
+# Debug: Try to connect as the postgres system user first
+echo -e "${GREEN}Debug: Attempting to connect as the 'postgres' system user...${NC}"
+if sudo -u postgres psql -l; then
+    echo -e "${GREEN}Successfully connected as 'postgres' system user.${NC}"
+else
+    echo -e "${RED}Failed to connect as 'postgres' system user. This may indicate a configuration issue.${NC}"
+    echo -e "${YELLOW}Please ensure the 'postgres' system user exists and has permissions to run PostgreSQL commands.${NC}"
+    exit 1
+fi
+
 # Verify PostgreSQL is running and accessible
 echo -e "${GREEN}Testing PostgreSQL connection...${NC}"
 # Try local socket connection first (no password for fresh install)
-if ! psql -U "$PG_USER" -lqt >/dev/null 2>&1; then
+echo -e "${GREEN}Debug: Trying local socket connection (no password)...${NC}"
+if psql -U "$PG_USER" -lqt; then
+    echo -e "${GREEN}Local socket connection successful.${NC}"
+else
     echo -e "${YELLOW}Local socket connection failed. Trying with password and localhost...${NC}"
-    if ! PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -lqt >/dev/null 2>&1; then
+    if PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -lqt; then
+        echo -e "${GREEN}TCP/IP connection successful.${NC}"
+    else
         echo -e "${RED}Cannot connect to PostgreSQL. This may be due to a fresh install with no password or misconfiguration.${NC}"
         echo -e "${YELLOW}Please run the following commands to set up PostgreSQL manually:${NC}"
         echo -e "${GREEN}sudo -u postgres psql${NC}"
@@ -143,17 +200,27 @@ if PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -d "$DB_NAME" -c '\q' >
     echo -e "${GREEN}Database $DB_NAME already exists.${NC}"
 else
     echo -e "${GREEN}Creating database $DB_NAME...${NC}"
-    PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -c "CREATE DATABASE $DB_NAME;" >/dev/null 2>&1 || { echo -e "${RED}Failed to create database $DB_NAME.${NC}"; exit 1; }
-    if ! PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -d "$DB_NAME" -c '\q' >/dev/null 2>&1; then
-        echo -e "${RED}Failed to verify database $DB_NAME after creation.${NC}"
+    if PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -c "CREATE DATABASE $DB_NAME;"; then
+        if PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -d "$DB_NAME" -c '\q' >/dev/null 2>&1; then
+            echo -e "${GREEN}Database $DB_NAME created successfully.${NC}"
+        else
+            echo -e "${RED}Failed to verify database $DB_NAME after creation.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}Failed to create database $DB_NAME.${NC}"
         exit 1
     fi
-    echo -e "${GREEN}Database $DB_NAME created successfully.${NC}"
 fi
 
 # 3. Install Dependencies
 echo -e "${GREEN}Installing dependencies...${NC}"
-cargo build --quiet || { echo -e "${RED}Failed to build backend.${NC}"; exit 1; }
+if cargo build --quiet; then
+    echo -e "${GREEN}Backend dependencies installed successfully.${NC}"
+else
+    echo -e "${RED}Failed to build backend.${NC}"
+    exit 1
+fi
 
 # 4. Configure Frontend and Build
 echo -e "${GREEN}Setting up frontend...${NC}"
@@ -164,11 +231,20 @@ if [ -d "frontend" ]; then
         exit 1
     fi
     echo -e "${GREEN}Installing frontend dependencies...${NC}"
-    npm install >/dev/null 2>&1 || { echo -e "${RED}Failed to install frontend dependencies.${NC}"; exit 1; }
+    if npm install; then
+        echo -e "${GREEN}Frontend dependencies installed successfully.${NC}"
+    else
+        echo -e "${RED}Failed to install frontend dependencies.${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}Building frontend...${NC}"
-    npm run build >/dev/null 2>&1 || { echo -e "${RED}Failed to build frontend.${NC}"; exit 1; }
+    if npm run build; then
+        echo -e "${GREEN}Frontend built successfully.${NC}"
+    else
+        echo -e "${RED}Failed to build frontend.${NC}"
+        exit 1
+    fi
     cd ..
-    echo -e "${GREEN}Frontend built successfully.${NC}"
 else
     echo -e "${YELLOW}Frontend directory not found. Skipping frontend setup.${NC}"
 fi
@@ -215,8 +291,12 @@ fi
 # 6. Apply Migrations
 echo -e "${GREEN}Applying database migrations...${NC}"
 source .env
-diesel migration run || { echo -e "${RED}Failed to apply migrations. Check PostgreSQL connection and DATABASE_URL in .env.${NC}"; exit 1; }
-echo -e "${GREEN}Migrations applied successfully.${NC}"
+if diesel migration run; then
+    echo -e "${GREEN}Migrations applied successfully.${NC}"
+else
+    echo -e "${RED}Failed to apply migrations. Check PostgreSQL connection and DATABASE_URL in .env.${NC}"
+    exit 1
+fi
 
 # 7. Stop any existing processes
 stop_processes
