@@ -210,10 +210,27 @@ if psql -U "$PG_USER" -lqt; then
     echo -e "${GREEN}Local socket connection successful.${NC}"
 else
     echo -e "${YELLOW}Local socket connection failed. Trying with password and localhost...${NC}"
+    if [ -z "$PG_PASS" ]; then
+        echo -e "${YELLOW}No password provided. Setting a default password for 'postgres' user...${NC}"
+        DEFAULT_PASS="default_password"
+        if sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DEFAULT_PASS'"; then
+            PG_PASS=$DEFAULT_PASS
+            echo -e "${GREEN}Default password '$DEFAULT_PASS' set for 'postgres' user.${NC}"
+            echo -e "${YELLOW}Please use '$DEFAULT_PASS' when prompted for the password.${NC}"
+        else
+            echo -e "${RED}Failed to set default password. Manual setup required.${NC}"
+            echo -e "${YELLOW}Please run the following commands to set up PostgreSQL manually:${NC}"
+            echo -e "${GREEN}sudo -u postgres psql${NC}"
+            echo -e "${GREEN}ALTER USER postgres WITH PASSWORD 'your_password';${NC}"
+            echo -e "${GREEN}\\q${NC}"
+            echo -e "${GREEN}Then rerun the script and enter 'your_password' when prompted.${NC}"
+            exit 1
+        fi
+    fi
     if PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -lqt; then
         echo -e "${GREEN}TCP/IP connection successful.${NC}"
     else
-        echo -e "${RED}Cannot connect to PostgreSQL. This may be due to a fresh install with no password or misconfiguration.${NC}"
+        echo -e "${RED}Cannot connect to PostgreSQL with provided password. This may be due to misconfiguration.${NC}"
         echo -e "${YELLOW}Please run the following commands to set up PostgreSQL manually:${NC}"
         echo -e "${GREEN}sudo -u postgres psql${NC}"
         echo -e "${GREEN}ALTER USER postgres WITH PASSWORD 'your_password';${NC}"
