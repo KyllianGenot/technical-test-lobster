@@ -234,7 +234,19 @@ show_success "Starting database service"
 
 # Node.js and npm
 if ! command_exists node || ! command_exists npm; then
-    install_package nodejs
+    start_progress "Installing Node.js and npm"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        (brew install nodejs > /dev/null 2>&1) &
+        show_spinner $! "Installing Node.js and npm"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        (sudo apt update > /dev/null 2>&1 && sudo apt install -y nodejs npm > /dev/null 2>&1) &
+        show_spinner $! "Installing Node.js and npm"
+    fi
+    if [ $? -eq 0 ]; then
+        show_success "Installing Node.js and npm"
+    else
+        show_error "Failed to install Node.js and npm"
+    fi
 fi
 
 # Diesel CLI
@@ -302,18 +314,30 @@ if [ -d "frontend" ]; then
     show_spinner $! "Installing frontend dependencies"
     if [ $? -eq 0 ]; then
         show_success "Installing frontend dependencies"
+        # Ensure the build outputs to frontend/dist
+        if [ -f "package.json" ]; then
+            start_progress "Configuring frontend build"
+            npm pkg set scripts.build="npm run build -- --outDir dist" > /dev/null 2>&1
+            show_success "Configuring frontend build"
+        fi
         start_progress "Building frontend"
         (npm run build > /dev/null 2>&1) &
         show_spinner $! "Building frontend"
-        if [ $? -eq 0 ]; then
+        if [ $? -eq 0 ] && [ -d "dist" ]; then
             show_success "Building frontend"
         else
-            show_error "Building frontend"
+            show_error "Building frontend failed or dist directory not found"
         fi
     else
         show_error "Installing frontend dependencies"
     fi
     cd ..
+    # Verify frontend/dist exists
+    if [ -d "frontend/dist" ]; then
+        show_success "Frontend build directory confirmed"
+    else
+        show_error "Frontend build directory (frontend/dist) not found"
+    fi
 fi
 
 # 5. Configure .env
@@ -326,7 +350,7 @@ if [ -f ".env" ]; then
     else
         read -p "Enter Alchemy API key: " ALCHEMY_KEY
         if [ -z "$ALCHEMY_KEY" ]; then
-            show_error "Configuring environment"
+            show_error "Configuring environment: Alchemy API key required"
         fi
 
         cat > .env << EOL
@@ -340,7 +364,7 @@ EOL
 else
     read -p "Enter Alchemy API key: " ALCHEMY_KEY
     if [ -z "$ALCHEMY_KEY" ]; then
-        show_error "Configuring environment"
+        show_error "Configuring environment: Alchemy API key required"
     fi
 
     cat > .env << EOL
