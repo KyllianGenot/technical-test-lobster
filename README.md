@@ -2,22 +2,62 @@
 
 Welcome to the **Ethereum ERC-20 Transfer Indexer**, a Rust-based service designed to monitor and index ERC-20 token transfers for the `LobsterToken` on the Ethereum Holesky testnet. This project provides a REST API to query transfer data and includes an optional React-based frontend for users to try out, with all data stored in a PostgreSQL database.
 
+## 🚀 Quick Start
+
+After cloning the repository, you can use our automated setup script to get up and running quickly:
+
+```bash
+git clone https://github.com/KyllianGenot/technical-test-lobster.git
+cd technical-test-lobster
+chmod +x setup.sh
+./setup.sh
+```
+
+The setup script will:
+- Install all required dependencies (Rust, PostgreSQL, Node.js, etc.)
+- Set up your PostgreSQL database
+- Configure your environment
+- Build the backend and frontend
+- Offer to start the application for you
+
+If you stop the application and want to restart it later, simply run:
+```bash
+RUST_LOG=info cargo run
+```
+
+To access the frontend or make API calls, open a new terminal window and either:
+- Make API calls directly: 
+  ```bash
+  curl http://localhost:8080/eth/transfers
+  # Filter by sender
+  curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890"
+  # Filter by recipient
+  curl "http://localhost:8080/eth/transfers?recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+  # Filter by both
+  curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890&recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+  ```
+- Start the frontend: 
+  ```bash
+  cd frontend/
+  npm start
+  ```
+
 - **Repository**: [https://github.com/KyllianGenot/technical-test-lobster](https://github.com/KyllianGenot/technical-test-lobster)
 - **Purpose**: A technical demonstration of blockchain indexing, API development, and full-stack integration.
 
 ## ✨ Features
 
 - **Real-time Indexing**: Tracks `LobsterToken` `Transfer` events and stores them in a PostgreSQL database.
-- **Historical Backfill**: Automatically indexes past transfers starting from the token’s deployment block.
-- **Optimized Backfill**: Uses binary search to efficiently detect the token’s deployment block.
+- **Historical Backfill**: Automatically indexes past transfers starting from the token's deployment block.
+- **Optimized Backfill**: Uses binary search to efficiently detect the token's deployment block.
 - **REST API**: Provides a `GET /eth/transfers` endpoint with optional sender and recipient filtering.
 - **Frontend UI**: An optional, minimalistic interface to view and filter transfer data by sender and recipient.
 - **Data Integrity**: Normalizes Ethereum addresses and prevents duplicate transfers.
 - **Modular Design**: Organized codebase for maintainability and scalability.
 
-## 🛠️ Setup Instructions
+## 🛠️ Manual Setup Instructions
 
-Follow these steps to get the project running locally. You'll need to install prerequisites, set up your PostgreSQL database, and configure your `.env` file.
+If you prefer to set up the project manually instead of using the setup script, follow these detailed steps:
 
 ### Prerequisites
 
@@ -217,6 +257,14 @@ To verify the project works as expected:
      ```bash
      curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890"
      ```
+   - Filter by recipient:  
+     ```bash
+     curl "http://localhost:8080/eth/transfers?recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+     ```
+   - Filter by both:
+     ```bash
+     curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890&recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+     ```
 
 3. **View the Frontend**:  
    Open [http://localhost:3000](http://localhost:3000), use the filters to search for transfers by sender or recipient, and verify the table displays the data.
@@ -260,6 +308,14 @@ Retrieve a list of LobsterToken transfers, sorted by block number (descending).
   ```bash
   curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890"
   ```
+- Filter by Recipient:  
+  ```bash
+  curl "http://localhost:8080/eth/transfers?recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+  ```
+- Filter by Both:  
+  ```bash
+  curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890&recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+  ```
 
 ### 🎨 Frontend Interface
 
@@ -271,29 +327,54 @@ The optional React-based UI includes:
 ### 📦 Dependencies
 
 #### Backend (Rust - Cargo.toml)
-- `actix-web = "4"`: REST API framework  
-- `actix-cors = "0.6.4"`: CORS support for the API  
-- `actix-files = "0.6.5"`: Serving static files  
-- `diesel = { version = "2", features = ["postgres", "r2d2"] }`: PostgreSQL ORM with connection pooling  
-- `dotenv = "0.15"`: Loading environment variables from `.env` files  
-- `env_logger = "0.11"`: Environment-based logging configuration  
-- `hex = "0.4"`: Hexadecimal encoding/decoding  
-- `log = "0.4"`: Logging framework  
-- `serde = { version = "1", features = ["derive"] }`: Serialization and deserialization  
-- `serde_json = "1"`: JSON handling  
-- `tokio = { version = "1", features = ["full"] }`: Async runtime  
-- `web3 = "0.19"`: Ethereum blockchain interaction  
+```toml
+[package]
+name = "technical-test-lobster"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+actix-cors = "0.6.4"
+actix-files = "0.6.5"
+diesel = { version = "2", features = ["postgres", "r2d2"] }
+dotenv = "0.15"
+env_logger = "0.11"
+hex = "0.4"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+web3 = "0.19"
+```
 
 #### Frontend (package.json)
-**Dependencies:**  
-- `react`: "^19.0.0" - UI library  
-- `react-dom`: "^19.0.0" - React rendering for the DOM  
-- `vite`: "^6.2.1" - Build tool and development server  
-
-**Dev Dependencies:**  
-- `@types/react`: "^19.0.10" - TypeScript types for React  
-- `@types/react-dom`: "^19.0.4" - TypeScript types for React DOM  
-- `@vitejs/plugin-react`: "^4.3.4" - Vite plugin for React support  
+```json
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^6.2.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4"
+  }
+}
+```
 
 ### ⚠️ Troubleshooting
 
