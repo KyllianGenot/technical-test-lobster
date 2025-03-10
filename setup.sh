@@ -77,6 +77,35 @@ if ! command_exists psql; then
     install_package postgresql
 fi
 
+# Install libpq-dev (Ubuntu) or libpq (macOS) for PostgreSQL development libraries
+echo -e "${GREEN}Installing PostgreSQL development libraries...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    if ! brew list libpq >/dev/null 2>&1; then
+        if brew install libpq; then
+            echo -e "${GREEN}libpq installed successfully with Homebrew.${NC}"
+        else
+            echo -e "${RED}Failed to install libpq with Homebrew.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}libpq is already installed.${NC}"
+    fi
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if ! dpkg -l | grep -q libpq-dev; then
+        if sudo apt update && sudo apt install -y libpq-dev; then
+            echo -e "${GREEN}libpq-dev installed successfully with apt.${NC}"
+        else
+            echo -e "${RED}Failed to install libpq-dev with apt.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}libpq-dev is already installed.${NC}"
+    fi
+else
+    echo -e "${RED}Unsupported OS. Please install PostgreSQL development libraries manually.${NC}"
+    exit 1
+fi
+
 # Start PostgreSQL and ensure it's running
 echo -e "${GREEN}Starting PostgreSQL service...${NC}"
 if [[ "$OSTYPE" == "darwin"* ]]; then
