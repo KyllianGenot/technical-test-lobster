@@ -271,9 +271,9 @@ fi
 
 # 3. Install Dependencies
 show_section "APPLICATION BUILD"
-start_progress "Building application"
+start_progress "Building application (this may take a few minutes)"
 (cargo build --quiet) &
-show_spinner $! "Building application"
+show_spinner $! "Building application (this may take a few minutes)"
 if [ $? -ne 0 ]; then
     show_error "Building application"
 fi
