@@ -4,7 +4,7 @@ Welcome to the **Ethereum ERC-20 Transfer Indexer**, a Rust-based service design
 
 ## 🚀 Quick Start
 
-After cloning the repository, you can use our automated setup script to get up and running quickly:
+To get started with this project, follow these steps:
 
 ```bash
 git clone https://github.com/KyllianGenot/technical-test-lobster.git
