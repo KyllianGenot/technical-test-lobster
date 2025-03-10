@@ -123,10 +123,18 @@ DB_NAME=${DB_NAME:-lobster_db}
 
 # Verify PostgreSQL is running and accessible
 echo -e "${GREEN}Testing PostgreSQL connection...${NC}"
-if ! PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -lqt >/dev/null 2>&1; then
-    echo -e "${RED}Cannot connect to PostgreSQL. Please ensure it’s running and accessible.${NC}"
-    echo -e "${GREEN}Try starting PostgreSQL manually: sudo service postgresql start${NC}"
-    exit 1
+# Try local socket connection first (no password for fresh install)
+if ! psql -U "$PG_USER" -lqt >/dev/null 2>&1; then
+    echo -e "${YELLOW}Local socket connection failed. Trying with password and localhost...${NC}"
+    if ! PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -lqt >/dev/null 2>&1; then
+        echo -e "${RED}Cannot connect to PostgreSQL. This may be due to a fresh install with no password or misconfiguration.${NC}"
+        echo -e "${YELLOW}Please run the following commands to set up PostgreSQL manually:${NC}"
+        echo -e "${GREEN}sudo -u postgres psql${NC}"
+        echo -e "${GREEN}ALTER USER postgres WITH PASSWORD 'your_password';${NC}"
+        echo -e "${GREEN}\\q${NC}"
+        echo -e "${GREEN}Then rerun the script and enter 'your_password' when prompted.${NC}"
+        exit 1
+    fi
 fi
 
 # Check if the specific database exists by trying to connect to it
