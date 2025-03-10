@@ -382,6 +382,7 @@ web3 = "0.19"
 - **API Not Responding**: Verify `RUST_LOG=info cargo run` is active.  
 - **Frontend Issues**: Run `npm install` in `frontend/` if dependencies are missing.  
 - **Indexer Fails with RPC Error**: If historical data is unavailable (e.g., "data before txNum=X is not available"), use a recent token or an Ethereum node with full archive support.  
+- **Indexer Fails with 503 Error**: If you see an error like `[ERROR technical_test_lobster] Indexer failed: code 503` in the logs, this may indicate a temporary issue with the Alchemy API (e.g., server overload or maintenance). This error can occur due to Alchemy's service availability rather than an issue in your code or configuration. Simply restarting the application with `RUST_LOG=info cargo run` may resolve it once the service is back online. If the issue persists, verify your Alchemy API key in `.env` or check Alchemy's status page for outages.
 
 ### 📋 Known Limitations
 
