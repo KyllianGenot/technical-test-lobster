@@ -18,11 +18,10 @@ async fn find_transfer_blocks(
 ) -> Result<(u64, u64), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let eth = web3.eth();
     let latest_block = eth.block_number().await?.as_u64();
-    let start_block = 0; // On commence du bloc 0 pour être sûr de tout capturer
+    let start_block = 0;
 
     info!("Searching for transfer blocks of token 0x{}", hex::encode(token_address.as_bytes()));
 
-    // Filtre initial large pour capturer tous les logs
     let filter = FilterBuilder::default()
         .address(vec![token_address])
         .topics(Some(vec![transfer_topic]), None, None, None)
@@ -38,7 +37,6 @@ async fn find_transfer_blocks(
         return Ok((latest_block, latest_block));
     }
 
-    // Trouver les blocs minimum et maximum
     let blocks_with_logs: Vec<u64> = logs.iter()
         .filter_map(|log| log.block_number.map(|num| num.as_u64()))
         .collect();
