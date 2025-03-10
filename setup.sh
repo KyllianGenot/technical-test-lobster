@@ -1,24 +1,90 @@
 #!/bin/bash
 
 # Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m'
+PRIMARY='\033[0;36m'
+SUCCESS='\033[0;32m'
+ERROR='\033[0;31m'
+WARN='\033[0;33m'
+WHITE='\033[0;37m'
+RESET='\033[0m'
+BOLD='\033[1m'
 
-# Progress function to show clean output
-show_progress() {
-    echo -e "${GREEN}⏳ $1...${NC}"
+# Symbols
+CHECK="✓"
+CROSS="✗"
+ARROW="→"
+
+# Spinner frames for loading animation
+SPINNER_FRAMES=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+
+# Function to display spinner during operations
+show_spinner() {
+    local pid=$1
+    local message=$2
+    local i=0
+    
+    echo -ne "\r\033[K${PRIMARY}${SPINNER_FRAMES[0]} ${message}${RESET}"
+    while kill -0 $pid 2>/dev/null; do
+        i=$(( (i+1) % ${#SPINNER_FRAMES[@]} ))
+        echo -ne "\r\033[K${PRIMARY}${SPINNER_FRAMES[$i]} ${message}${RESET}"
+        sleep 0.1
+    done
+    echo -ne "\r\033[K"  # Efface complètement la ligne après le spinner
+}
+
+# Progress function with spinner start
+start_progress() {
+    echo -ne "\r\033[K${PRIMARY}${SPINNER_FRAMES[0]} ${BOLD}$1${RESET}"
+}
+
+# Update progress (for longer operations)
+update_progress() {
+    echo -ne "\r\033[K${PRIMARY}${SPINNER_FRAMES[$(($RANDOM % 10))]} ${BOLD}$1${RESET}"
 }
 
 # Success function for completed steps
 show_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo -e "\r\033[K${SUCCESS}${CHECK} $1${RESET}"
 }
 
 # Error function for failures
 show_error() {
-    echo -e "${RED}❌ $1${NC}"
+    echo -e "\r\033[K${ERROR}${CROSS} $1${RESET}"
     exit 1
+}
+
+# Info function for general information
+show_info() {
+    echo -e "\r\033[K${WARN}${ARROW} $1${RESET}"
+}
+
+# Section header with dynamic centering
+show_section() {
+    local title=$1
+    local width=60
+    local padding=$(( (width - ${#title}) / 2 ))
+    local left_padding=$(printf "%${padding}s" "")
+    echo -e "\n${WHITE}────────────────────────────────────────────────────────────${RESET}"
+    echo -e "${WHITE}${left_padding}${title}${left_padding// / }${RESET}"
+    echo -e "${WHITE}────────────────────────────────────────────────────────────${RESET}\n"
+}
+
+# Centered welcome message with ASCII art
+show_welcome() {
+    echo -e "\n"
+    echo -e "${WHITE}╔══════════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${WHITE}║                                                                  ║${RESET}"
+    echo -e "${WHITE}║    ██╗      ██████╗ ██████╗ ███████╗████████╗███████╗██████╗     ║${RESET}"
+    echo -e "${WHITE}║    ██║     ██╔═══██╗██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔══██╗    ║${RESET}"
+    echo -e "${WHITE}║    ██║     ██║   ██║██████╔╝███████╗   ██║   █████╗  ██████╔╝    ║${RESET}"
+    echo -e "${WHITE}║    ██║     ██║   ██║██╔══██╗╚════██║   ██║   ██╔══╝  ██╔══██╗    ║${RESET}"
+    echo -e "${WHITE}║    ███████╗╚██████╔╝██████╔╝███████║   ██║   ███████╗██║  ██║    ║${RESET}"
+    echo -e "${WHITE}║    ╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝    ║${RESET}"
+    echo -e "${WHITE}║                                                                  ║${RESET}"
+    echo -e "${WHITE}║                       TECHNICAL TEST SETUP                       ║${RESET}"
+    echo -e "${WHITE}║                                                                  ║${RESET}"
+    echo -e "${WHITE}╚══════════════════════════════════════════════════════════════════╝${RESET}"
+    echo -e "\nThis script will set up everything you need to run the application.\n"
 }
 
 # Function to check if a command exists
@@ -30,10 +96,12 @@ command_exists() {
 install_package() {
     local package=$1
     if ! command_exists "$package"; then
-        show_progress "Installing $package"
+        start_progress "Installing $package"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            if brew install "$package" > /dev/null 2>&1; then
-                show_success "$package installed"
+            brew install "$package" > /dev/null 2>&1 &
+            show_spinner $! "Installing $package"
+            if [ $? -eq 0 ]; then
+                show_success "Installing $package"
             else
                 show_error "Failed to install $package"
             fi
@@ -41,8 +109,10 @@ install_package() {
             if ! command_exists apt; then
                 show_error "apt not found, please install $package manually"
             fi
-            if sudo apt update > /dev/null 2>&1 && sudo apt install -y "$package" > /dev/null 2>&1; then
-                show_success "$package installed"
+            (sudo apt update > /dev/null 2>&1 && sudo apt install -y "$package" > /dev/null 2>&1) &
+            show_spinner $! "Installing $package"
+            if [ $? -eq 0 ]; then
+                show_success "Installing $package"
             else
                 show_error "Failed to install $package"
             fi
@@ -54,28 +124,29 @@ install_package() {
 
 # Function to stop all related processes
 stop_processes() {
-    show_progress "Stopping any running instances"
+    start_progress "Stopping any running instances"
     if sudo lsof -i :8080 >/dev/null 2>&1; then
         sudo lsof -i :8080 | grep LISTEN | awk '{print $2}' | xargs kill -9 >/dev/null 2>&1 || true
     fi
     pkill -9 cargo >/dev/null 2>&1 || true
     pkill -9 technical-test-lobster >/dev/null 2>&1 || true
-    show_success "Environment ready"
+    show_success "Stopping any running instances"
 }
 
 # Display welcome message
-echo -e "\n${GREEN}=== Lobster Technical Test Setup ===${NC}"
-echo -e "This script will set up everything you need to run the application.\n"
+show_welcome
 
 # 1. Install Prerequisites
-show_progress "Setting up development environment"
+show_section "DEVELOPMENT ENVIRONMENT SETUP"
 
 # Rust
 if ! command_exists rustc || ! command_exists cargo; then
-    show_progress "Installing Rust"
-    if curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1; then
+    start_progress "Installing Rust"
+    (curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1) &
+    show_spinner $! "Installing Rust"
+    if [ $? -eq 0 ]; then
         source "$HOME/.cargo/env" > /dev/null 2>&1 || show_error "Failed to source Rust environment"
-        show_success "Rust installed"
+        show_success "Installing Rust"
     else
         show_error "Failed to install Rust"
     fi
@@ -89,16 +160,22 @@ fi
 # Install PostgreSQL development libraries
 if [[ "$OSTYPE" == "darwin"* ]]; then
     if ! brew list libpq >/dev/null 2>&1; then
-        if brew install libpq > /dev/null 2>&1; then
-            show_success "PostgreSQL dev libraries installed"
+        start_progress "Installing PostgreSQL dev libraries"
+        (brew install libpq > /dev/null 2>&1) &
+        show_spinner $! "Installing PostgreSQL dev libraries"
+        if [ $? -eq 0 ]; then
+            show_success "Installing PostgreSQL dev libraries"
         else
             show_error "Failed to install PostgreSQL dev libraries"
         fi
     fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if ! dpkg -l | grep -q libpq-dev; then
-        if sudo apt update > /dev/null 2>&1 && sudo apt install -y libpq-dev > /dev/null 2>&1; then
-            show_success "PostgreSQL dev libraries installed"
+        start_progress "Installing PostgreSQL dev libraries"
+        (sudo apt update > /dev/null 2>&1 && sudo apt install -y libpq-dev > /dev/null 2>&1) &
+        show_spinner $! "Installing PostgreSQL dev libraries"
+        if [ $? -eq 0 ]; then
+            show_success "Installing PostgreSQL dev libraries"
         else
             show_error "Failed to install PostgreSQL dev libraries"
         fi
@@ -106,32 +183,39 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 fi
 
 # Install development tools
-show_progress "Installing development tools"
+start_progress "Installing development tools"
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if ! command_exists pkg-config; then
-        sudo apt install -y pkg-config > /dev/null 2>&1
+        (sudo apt install -y pkg-config > /dev/null 2>&1) &
+        show_spinner $! "Installing pkg-config"
     fi
     if ! dpkg -l | grep -q libssl-dev; then
-        sudo apt install -y libssl-dev > /dev/null 2>&1
+        (sudo apt install -y libssl-dev > /dev/null 2>&1) &
+        show_spinner $! "Installing libssl-dev"
     fi
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     if ! brew list pkg-config >/dev/null 2>&1; then
-        brew install pkg-config > /dev/null 2>&1
+        (brew install pkg-config > /dev/null 2>&1) &
+        show_spinner $! "Installing pkg-config"
     fi
     if ! brew list openssl >/dev/null 2>&1; then
-        brew install openssl > /dev/null 2>&1
+        (brew install openssl > /dev/null 2>&1) &
+        show_spinner $! "Installing openssl"
     fi
 fi
+show_success "Installing development tools"
 
 # Start PostgreSQL
-show_progress "Starting database service"
+start_progress "Starting database service"
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    brew services start postgresql > /dev/null 2>&1
+    (brew services start postgresql > /dev/null 2>&1) &
+    show_spinner $! "Starting database service"
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    sudo service postgresql start > /dev/null 2>&1
+    (sudo service postgresql start > /dev/null 2>&1) &
+    show_spinner $! "Starting database service"
 fi
 sleep 2
-show_success "Database service running"
+show_success "Starting database service"
 
 # Node.js and npm
 if ! command_exists node || ! command_exists npm; then
@@ -140,16 +224,19 @@ fi
 
 # Diesel CLI
 if ! command_exists diesel; then
-    show_progress "Installing Diesel CLI"
-    if cargo install diesel_cli --no-default-features --features postgres > /dev/null 2>&1; then
-        show_success "Diesel CLI installed"
+    start_progress "Installing Diesel CLI"
+    (cargo install diesel_cli --no-default-features --features postgres > /dev/null 2>&1) &
+    show_spinner $! "Installing Diesel CLI"
+    if [ $? -eq 0 ]; then
+        show_success "Installing Diesel CLI"
     else
         show_error "Failed to install Diesel CLI"
     fi
 fi
 
 # 2. Set Up the Database
-show_progress "Setting up database"
+show_section "DATABASE CONFIGURATION"
+echo -e "${PRIMARY}* Setting up database${RESET}"
 read -p "Enter PostgreSQL username [default: postgres]: " PG_USER
 PG_USER=${PG_USER:-postgres}
 read -p "Enter PostgreSQL password [press Enter if none]: " -s PG_PASS
@@ -160,9 +247,11 @@ DB_NAME=${DB_NAME:-lobster_db}
 # Set default password if none provided
 if [ -z "$PG_PASS" ]; then
     DEFAULT_PASS="default_password"
-    if sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DEFAULT_PASS'" > /dev/null 2>&1; then
+    (sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DEFAULT_PASS'" > /dev/null 2>&1) &
+    show_spinner $! "Setting default password for database user"
+    if [ $? -eq 0 ]; then
         PG_PASS=$DEFAULT_PASS
-        echo -e "${GREEN}Default password set for database user${NC}"
+        show_info "Setting default password for database user"
     else
         show_error "Failed to set database password. Please run the script again with administrator privileges."
     fi
@@ -170,42 +259,59 @@ fi
 
 # Create database if it doesn't exist
 if ! PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -d "$DB_NAME" -c '\q' >/dev/null 2>&1; then
-    show_progress "Creating database $DB_NAME"
-    if PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -c "CREATE DATABASE $DB_NAME;" > /dev/null 2>&1; then
-        show_success "Database created"
+    start_progress "Creating database $DB_NAME"
+    (PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -c "CREATE DATABASE $DB_NAME;" > /dev/null 2>&1) &
+    show_spinner $! "Creating database $DB_NAME"
+    if [ $? -eq 0 ]; then
+        show_success "Creating database $DB_NAME"
     else
         show_error "Failed to create database"
     fi
 fi
 
 # 3. Install Dependencies
-show_progress "Building application"
-if ! cargo build --quiet; then
-    show_error "Failed to build backend"
+show_section "APPLICATION BUILD"
+start_progress "Building application"
+(cargo build --quiet) &
+show_spinner $! "Building application"
+if [ $? -ne 0 ]; then
+    show_error "Building application"
 fi
+show_success "Building application"
 
 # 4. Configure Frontend and Build
 if [ -d "frontend" ]; then
-    show_progress "Setting up frontend"
+    start_progress "Setting up frontend"
     cd frontend
-    if npm install > /dev/null 2>&1 && npm run build > /dev/null 2>&1; then
-        show_success "Frontend built"
+    (npm install > /dev/null 2>&1) &
+    show_spinner $! "Installing frontend dependencies"
+    if [ $? -eq 0 ]; then
+        show_success "Installing frontend dependencies"
+        start_progress "Building frontend"
+        (npm run build > /dev/null 2>&1) &
+        show_spinner $! "Building frontend"
+        if [ $? -eq 0 ]; then
+            show_success "Building frontend"
+        else
+            show_error "Building frontend"
+        fi
     else
-        show_error "Failed to build frontend"
+        show_error "Installing frontend dependencies"
     fi
     cd ..
 fi
 
 # 5. Configure .env
-show_progress "Configuring environment"
+show_section "ENVIRONMENT CONFIGURATION"
+echo -e "${PRIMARY}* Configuring environment${RESET}"
 if [ -f ".env" ]; then
     read -p "Existing configuration found. Overwrite? (y/N): " overwrite
     if [[ "$overwrite" != [yY] ]]; then
-        show_success "Using existing configuration"
+        show_success "Configuring environment"
     else
         read -p "Enter Alchemy API key: " ALCHEMY_KEY
         if [ -z "$ALCHEMY_KEY" ]; then
-            show_error "Alchemy API key is required"
+            show_error "Configuring environment"
         fi
 
         cat > .env << EOL
@@ -214,12 +320,12 @@ ETHEREUM_NODE_URL=https://eth-holesky.g.alchemy.com/v2/$ALCHEMY_KEY
 ETHEREUM_TOKEN_ADDRESS=0xf794F9B70FB3D9F5a3d5823898c0b2E560bD4348
 API_PORT=8080
 EOL
-        show_success "Configuration updated"
+        show_success "Configuring environment"
     fi
 else
     read -p "Enter Alchemy API key: " ALCHEMY_KEY
     if [ -z "$ALCHEMY_KEY" ]; then
-        show_error "Alchemy API key is required"
+        show_error "Configuring environment"
     fi
 
     cat > .env << EOL
@@ -228,19 +334,23 @@ ETHEREUM_NODE_URL=https://eth-holesky.g.alchemy.com/v2/$ALCHEMY_KEY
 ETHEREUM_TOKEN_ADDRESS=0xf794F9B70FB3D9F5a3d5823898c0b2E560bD4348
 API_PORT=8080
 EOL
-    show_success "Configuration created"
+    show_success "Configuring environment"
 fi
 
 # 6. Apply Migrations
-show_progress "Setting up database schema"
+show_section "DATABASE MIGRATION"
+start_progress "Setting up database schema"
 source .env
-if diesel migration run > /dev/null 2>&1; then
-    show_success "Database schema ready"
+(diesel migration run > /dev/null 2>&1) &
+show_spinner $! "Setting up database schema"
+if [ $? -eq 0 ]; then
+    show_success "Setting up database schema"
 else
-    show_error "Failed to set up database schema. Check your PostgreSQL connection."
+    show_error "Setting up database schema. Check your PostgreSQL connection."
 fi
 
 # 7. Stop any existing processes
+show_section "APPLICATION LAUNCH"
 stop_processes
 
 # 8. Launch Backend
@@ -249,14 +359,16 @@ echo ""
 read -p "Launch the application now? (Y/n): " launch
 if [[ "$launch" != [nN] ]]; then
     # Trap Ctrl+C to stop all processes
-    trap 'echo -e "\n${GREEN}Stopping application...${NC}"; stop_processes; exit 0' INT
+    trap 'echo -e "\n${SUCCESS}Stopping application...${RESET}"; stop_processes; exit 0' INT
 
     # Launch backend in the foreground
-    echo -e "\n${GREEN}Starting application on http://localhost:8080${NC}"
-    echo -e "${GREEN}Press Ctrl+C to stop${NC}\n"
+    echo -e "\n${WHITE}════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${WHITE}          APPLICATION RUNNING AT http://localhost:8080          ${RESET}"
+    echo -e "${WHITE}                    Press Ctrl+C to stop                    ${RESET}"
+    echo -e "${WHITE}════════════════════════════════════════════════════════════${RESET}\n"
     RUST_LOG=info cargo run
 else
-    echo -e "\n${GREEN}You can start the application manually with:${NC}"
+    echo -e "\n${SUCCESS}You can start the application manually with:${RESET}"
     echo -e "  RUST_LOG=info cargo run"
     echo ""
 fi
