@@ -29,7 +29,7 @@ show_spinner() {
         echo -ne "\r\033[K${PRIMARY}${SPINNER_FRAMES[$i]} ${message}${RESET}"
         sleep 0.1
     done
-    echo -ne "\r\033[K"  # Efface complètement la ligne après le spinner
+    echo -ne "\r\033[K"  # Clear the line after spinner
 }
 
 # Progress function with spinner start
@@ -77,7 +77,7 @@ show_welcome() {
     echo -e "${WHITE}║    ██╗      ██████╗ ██████╗ ███████╗████████╗███████╗██████╗     ║${RESET}"
     echo -e "${WHITE}║    ██║     ██╔═══██╗██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔══██╗    ║${RESET}"
     echo -e "${WHITE}║    ██║     ██║   ██║██████╔╝███████╗   ██║   █████╗  ██████╔╝    ║${RESET}"
-    echo -e "${WHITE}║    ██║     ██║   ██║██╔══██╗╚════██║   ██║   ██╔══╝  ██╔══██╗    ║${RESET}"
+    echo -e "${WHITE}║    ██║     ██║   ██║██╔══██╗╚════██║   ██║   ██╔==╝  ██╔══██╗    ║${RESET}"
     echo -e "${WHITE}║    ███████╗╚██████╔╝██████╔╝███████║   ██║   ███████╗██║  ██║    ║${RESET}"
     echo -e "${WHITE}║    ╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝    ║${RESET}"
     echo -e "${WHITE}║                                                                  ║${RESET}"
@@ -300,36 +300,47 @@ fi
 show_section "APPLICATION BUILD"
 start_progress "Building application (this may take a few minutes)"
 (cargo build --quiet) &
-show_spinner $! "Building application (this may take a few minutes)"
+pid=$!
+show_spinner $pid "Building application (this may take a few minutes)"
+wait $pid
 if [ $? -ne 0 ]; then
-    show_error "Building application"
+    show_error "Building application failed. Check your internet connection or Rust configuration."
 fi
 show_success "Building application"
 
 # 4. Configure Frontend and Build
 if [ -d "frontend" ]; then
+    if [ ! -f "frontend/package.json" ]; then
+        show_error "Frontend directory exists but package.json is missing. Please ensure the frontend is properly configured."
+    fi
     start_progress "Setting up frontend"
     cd frontend
     (npm install > /dev/null 2>&1) &
-    show_spinner $! "Installing frontend dependencies"
+    pid=$!
+    show_spinner $pid "Installing frontend dependencies"
+    wait $pid
     if [ $? -eq 0 ]; then
         show_success "Installing frontend dependencies"
-        # Ensure the build outputs to frontend/dist
-        if [ -f "package.json" ]; then
+        # Check if build script exists and configure it
+        if [ -f "package.json" ] && grep -q '"build":' package.json; then
             start_progress "Configuring frontend build"
-            npm pkg set scripts.build="npm run build -- --outDir dist" > /dev/null 2>&1
+            npm pkg set scripts.build="vite build --outDir dist" > /dev/null 2>&1  # Adjust if not Vite
             show_success "Configuring frontend build"
+        else
+            show_info "No build script found in package.json. Assuming manual configuration."
         fi
         start_progress "Building frontend"
         (npm run build > /dev/null 2>&1) &
-        show_spinner $! "Building frontend"
+        pid=$!
+        show_spinner $pid "Building frontend"
+        wait $pid
         if [ $? -eq 0 ] && [ -d "dist" ]; then
             show_success "Building frontend"
         else
-            show_error "Building frontend failed or dist directory not found"
+            show_error "Building frontend failed or dist directory not found."
         fi
     else
-        show_error "Installing frontend dependencies"
+        show_error "Installing frontend dependencies failed."
     fi
     cd ..
     # Verify frontend/dist exists
@@ -338,6 +349,8 @@ if [ -d "frontend" ]; then
     else
         show_error "Frontend build directory (frontend/dist) not found"
     fi
+else
+    show_info "No frontend directory found. Skipping frontend setup."
 fi
 
 # 5. Configure .env
