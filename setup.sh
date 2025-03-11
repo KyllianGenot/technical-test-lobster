@@ -29,7 +29,7 @@ show_spinner() {
         echo -ne "\r\033[K${PRIMARY}${SPINNER_FRAMES[$i]} ${message}${RESET}"
         sleep 0.1
     done
-    echo -ne "\r\033[K"  # Clear the line after spinner
+    echo -ne "\r\033[K"
 }
 
 # Progress function with spinner start
@@ -77,7 +77,7 @@ show_welcome() {
     echo -e "${WHITE}║    ██╗      ██████╗ ██████╗ ███████╗████████╗███████╗██████╗     ║${RESET}"
     echo -e "${WHITE}║    ██║     ██╔═══██╗██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔══██╗    ║${RESET}"
     echo -e "${WHITE}║    ██║     ██║   ██║██████╔╝███████╗   ██║   █████╗  ██████╔╝    ║${RESET}"
-    echo -e "${WHITE}║    ██║     ██║   ██║██╔══██╗╚════██║   ██║   ██╔==╝  ██╔══██╗    ║${RESET}"
+    echo -e "${WHITE}║    ██║     ██║   ██║██╔══██╗╚════██║   ██║   ██╔══╝  ██╔══██╗    ║${RESET}"
     echo -e "${WHITE}║    ███████╗╚██████╔╝██████╔╝███████║   ██║   ███████╗██║  ██║    ║${RESET}"
     echo -e "${WHITE}║    ╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝    ║${RESET}"
     echo -e "${WHITE}║                                                                  ║${RESET}"
@@ -94,7 +94,6 @@ ensure_sudo() {
         echo -e "${WARN}${ARROW} Please enter your sudo password:${RESET}"
         sudo -v || show_error "Failed to obtain sudo privileges"
     fi
-    # Keep sudo alive during script execution
     (while true; do sudo -n true; sleep 60; done) &
     local sudo_pid=$!
     trap "kill $sudo_pid 2>/dev/null; exit" EXIT INT TERM
@@ -267,11 +266,10 @@ echo -e "${PRIMARY}* Setting up database${RESET}"
 read -p "Enter PostgreSQL username [default: postgres]: " PG_USER
 PG_USER=${PG_USER:-postgres}
 read -p "Enter PostgreSQL password [press Enter if none]: " -s PG_PASS
-echo ""  # Add newline after password input
+echo ""
 read -p "Enter database name [default: lobster_db]: " DB_NAME
 DB_NAME=${DB_NAME:-lobster_db}
 
-# Set default password if none provided
 if [ -z "$PG_PASS" ]; then
     DEFAULT_PASS="default_password"
     (sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DEFAULT_PASS'" > /dev/null 2>&1) &
@@ -284,7 +282,6 @@ if [ -z "$PG_PASS" ]; then
     fi
 fi
 
-# Create database if it doesn't exist
 if ! PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -d "$DB_NAME" -c '\q' >/dev/null 2>&1; then
     start_progress "Creating database $DB_NAME"
     (PGPASSWORD="$PG_PASS" psql -U "$PG_USER" -h localhost -c "CREATE DATABASE $DB_NAME;" > /dev/null 2>&1) &
@@ -321,10 +318,9 @@ if [ -d "frontend" ]; then
     wait $pid
     if [ $? -eq 0 ]; then
         show_success "Installing frontend dependencies"
-        # Check if build script exists and configure it
         if [ -f "package.json" ] && grep -q '"build":' package.json; then
             start_progress "Configuring frontend build"
-            npm pkg set scripts.build="vite build --outDir dist" > /dev/null 2>&1  # Adjust if not Vite
+            npm pkg set scripts.build="vite build --outDir dist" > /dev/null 2>&1
             show_success "Configuring frontend build"
         else
             show_info "No build script found in package.json. Assuming manual configuration."
@@ -343,7 +339,6 @@ if [ -d "frontend" ]; then
         show_error "Installing frontend dependencies failed."
     fi
     cd ..
-    # Verify frontend/dist exists
     if [ -d "frontend/dist" ]; then
         show_success "Frontend build directory confirmed"
     else
@@ -410,10 +405,8 @@ show_success "Setup completed successfully!"
 echo ""
 read -p "Launch the application now? (Y/n): " launch
 if [[ "$launch" != [nN] ]]; then
-    # Trap Ctrl+C to stop all processes
     trap 'echo -e "\n${SUCCESS}Stopping application...${RESET}"; stop_processes; exit 0' INT
 
-    # Launch backend in the foreground
     echo -e "\n${WHITE}════════════════════════════════════════════════════════════${RESET}"
     echo -e "${WHITE}          APPLICATION RUNNING AT http://localhost:8080          ${RESET}"
     echo -e "${WHITE}                    Press Ctrl+C to stop                    ${RESET}"
