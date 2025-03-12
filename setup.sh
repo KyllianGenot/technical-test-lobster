@@ -407,10 +407,10 @@ read -p "Launch the application now? (Y/n): " launch
 if [[ "$launch" != [nN] ]]; then
     trap 'echo -e "\n${SUCCESS}Stopping application...${RESET}"; stop_processes; exit 0' INT
 
-    echo -e "\n${WHITE}════════════════════════════════════════════════════════════${RESET}"
-    echo -e "${WHITE}          APPLICATION RUNNING AT http://localhost:8080          ${RESET}"
-    echo -e "${WHITE}                    Press Ctrl+C to stop                    ${RESET}"
-    echo -e "${WHITE}════════════════════════════════════════════════════════════${RESET}\n"
+    echo -e "\n${WHITE}════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${WHITE}              APPLICATION RUNNING AT http://localhost:8080          ${RESET}"
+    echo -e "${WHITE}                        Press Ctrl+C to stop                    ${RESET}"
+    echo -e "${WHITE}════════════════════════════════════════════════════════════════════${RESET}\n"
     RUST_LOG=info cargo run
 else
     echo -e "\n${SUCCESS}You can start the application manually with:${RESET}"
