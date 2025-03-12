@@ -21,6 +21,7 @@ mod api;
 
 type DbPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 
+/// Creates a database connection pool for PostgreSQL.
 fn create_db_pool(database_url: &str) -> Result<DbPool, diesel::r2d2::Error> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     diesel::r2d2::Pool::builder().build(manager).map_err(|e| {
@@ -30,11 +31,14 @@ fn create_db_pool(database_url: &str) -> Result<DbPool, diesel::r2d2::Error> {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    // Load environment variables from .env file if it exists.
     dotenv().ok();
     
+    // Initialize logging for the application.
     env_logger::init();
     info!("Starting Main Application");
 
+    // Retrieve required environment variables, fail if not set.
     let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in .env file");
     
@@ -49,32 +53,39 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap_or(8080);
 
+    // Log the configuration details for monitoring.
     info!("Using database URL: {}", database_url);
     info!("Using Ethereum node URL: {}", ethereum_node_url);
     info!("Using token address: {}", ethereum_token_address);
     info!("Using API port: {}", api_port);
 
+    // Create database pool, exit on failure.
     let pool = create_db_pool(&database_url).unwrap_or_else(|e| {
         eprintln!("Database pool failed: {}", e);
         std::process::exit(1);
     });
     info!("Database pool initialized successfully");
 
+    // Initialize TransferRepo with a cloned pool.
     let _transfer_repo = repositories::transfer_repo::TransferRepo::new(pool.clone());
     info!("TransferRepo initialized");
 
+    // Attempt to connect to the Ethereum node and log the result.
     match connect_to_node(&ethereum_node_url).await {
         Ok(web3) => info!("Connected to Ethereum node: {:?}", web3.eth().chain_id().await),
         Err(e) => eprintln!("Failed to connect to Ethereum node: {}", e),
     }
 
+    // Create a channel for signaling shutdown to the indexer.
     let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
 
+    // Clone data for the indexer task to run independently.
     let indexer_shutdown_rx = shutdown_rx;
     let indexer_pool = pool.clone();
     let indexer_node_url = ethereum_node_url.clone();
     let indexer_token_address = ethereum_token_address.clone();
 
+    // Spawn the indexer as a background task.
     tokio::spawn(async move {
         if let Err(e) = start_indexing(
             indexer_pool,
@@ -86,6 +97,7 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
+    // Start the API server with the configured port.
     info!("Starting API server on port {}", api_port);
     let server = HttpServer::new(move || {
         let app = App::new()
@@ -99,6 +111,7 @@ async fn main() -> std::io::Result<()> {
 
     let result = server.await;
 
+    // Signal shutdown to the indexer.
     let _ = shutdown_tx.send(());
 
     result

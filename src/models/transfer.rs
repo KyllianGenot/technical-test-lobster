@@ -2,6 +2,7 @@ use diesel::prelude::*;
 use serde::Serialize;
 use crate::schema::transfers;
 
+/// Represents a transfer event retrieved from the database.
 #[derive(Queryable, Serialize, Debug)]
 #[diesel(table_name = transfers)]
 pub struct Transfer {
@@ -13,6 +14,7 @@ pub struct Transfer {
     pub tx_hash: String,
 }
 
+/// Represents a new transfer event to be inserted into the database.
 #[derive(Insertable, Debug)]
 #[diesel(table_name = transfers)]
 pub struct NewTransfer {

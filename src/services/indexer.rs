@@ -11,6 +11,7 @@ use tokio::sync::broadcast;
 use tokio::task;
 use std::sync::Arc;
 
+/// Finds the block range containing ERC-20 Transfer events for a token.
 async fn find_transfer_blocks(
     web3: &web3::Web3<web3::transports::Http>,
     token_address: H160,
@@ -47,6 +48,7 @@ async fn find_transfer_blocks(
     Ok((*min_block, *max_block))
 }
 
+/// Processes a batch of logs and stores transfer events in the database.
 async fn process_logs_batch(
     web3: &web3::Web3<web3::transports::Http>,
     transfer_repo: Arc<TransferRepo>,
@@ -88,6 +90,7 @@ async fn process_logs_batch(
     Ok(())
 }
 
+/// Backfills historical transfer events into the database within a block range.
 async fn backfill_transfers(
     pool: diesel::r2d2::Pool<ConnectionManager<PgConnection>>,
     web3: web3::Web3<web3::transports::Http>,
@@ -98,7 +101,7 @@ async fn backfill_transfers(
     let eth = web3.eth();
     let token_address_h160 = token_address.parse::<H160>()?;
     let transfer_topic = H256::from_slice(
-        &hex::decode("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")?,
+        &hex::decode("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")?, // ERC-20 Transfer event topic hash.
     );
     let transfer_repo = Arc::new(TransferRepo::new(pool));
     let latest_block = eth.block_number().await?.as_u64();
@@ -106,7 +109,7 @@ async fn backfill_transfers(
     info!("Backfilling transfers from block {} to {}", start_block, actual_end_block);
 
     let mut tasks = Vec::new();
-    const BATCH_SIZE: u64 = 100_000;
+    const BATCH_SIZE: u64 = 100_000; // Process blocks in batches to avoid overloading the node.
 
     let mut from_block = start_block;
     while from_block <= actual_end_block {
@@ -141,6 +144,7 @@ async fn backfill_transfers(
     Ok(())
 }
 
+/// Starts the indexer to monitor and store ERC-20 Transfer events.
 pub async fn start_indexing(
     pool: diesel::r2d2::Pool<ConnectionManager<PgConnection>>,
     node_url: String,
@@ -152,13 +156,13 @@ pub async fn start_indexing(
     let token_address_h160 = token_address.parse::<H160>()?;
     info!("Monitoring token address: 0x{}", hex::encode(token_address_h160.as_bytes()));
     let transfer_topic = H256::from_slice(
-        &hex::decode("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")?,
+        &hex::decode("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")?, // ERC-20 Transfer event topic hash.
     );
     let transfer_repo = Arc::new(TransferRepo::new(pool.clone()));
     let (min_block, max_block) = find_transfer_blocks(&web3, token_address_h160, transfer_topic).await?;
     backfill_transfers(pool.clone(), web3.clone(), token_address.clone(), min_block, max_block).await?;
     let mut last_block = eth.block_number().await?.as_u64();
-    let mut interval = interval(Duration::from_secs(5));
+    let mut interval = interval(Duration::from_secs(5)); // Check for new blocks every 5 seconds.
     loop {
         tokio::select! {
             _ = shutdown_rx.recv() => {
@@ -182,7 +186,7 @@ pub async fn start_indexing(
                 }
                 let mut from_block = last_block + 1;
                 let to_block = latest_block;
-                const BATCH_SIZE: u64 = 100;
+                const BATCH_SIZE: u64 = 100; // Process smaller batches for real-time indexing.
                 while from_block <= to_block {
                     let batch_end = (from_block + BATCH_SIZE - 1).min(to_block);
                     let filter = FilterBuilder::default()
