@@ -1,9 +1,7 @@
 # Ethereum ERC-20 Transfer Indexer
-
 Welcome to the **Ethereum ERC-20 Transfer Indexer**, a Rust-based service designed to monitor and index ERC-20 token transfers for the `LobsterToken` on the Ethereum Holesky testnet. This project provides a REST API to query transfer data and includes an optional React-based frontend for users to try out, with all data stored in a PostgreSQL database.
 
 ## 🚀 Quick Start
-
 To get started with this project, you can either clone the repository or download it as a ZIP file. Follow these steps:
 
 ### Option 1: Clone the Repository
@@ -26,6 +24,16 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
+## 💾 PostgreSQL Connection Note
+When prompted for PostgreSQL credentials during setup:
+- If you don't have a custom PostgreSQL account set up, you can simply press Enter three times to use the default settings:
+  - Username: `postgres` (default)
+  - Password: (leave empty)
+  - Database name: `lobster_db` (default)
+
+This will work in most cases where PostgreSQL was installed with default settings. The script will automatically set up a default password if none is provided.
+
+## 🔧 Setup Details
 The setup script will:
 - Install all required dependencies (Rust, PostgreSQL, Node.js, etc.)
 - Set up your PostgreSQL database
@@ -38,6 +46,7 @@ If you stop the application and want to restart it later, simply run:
 RUST_LOG=info cargo run
 ```
 
+## 📡 Using the Application
 To access the frontend or make API calls, open a new terminal window and either:
 - Make API calls directly: 
   ```bash
