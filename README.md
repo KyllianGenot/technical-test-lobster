@@ -4,11 +4,24 @@ Welcome to the **Ethereum ERC-20 Transfer Indexer**, a Rust-based service design
 
 ## 🚀 Quick Start
 
-To get started with this project, follow these steps:
+To get started with this project, you can either clone the repository or download it as a ZIP file. Follow these steps:
 
+### Option 1: Clone the Repository
+If you have Git installed:
 ```bash
 git clone https://github.com/KyllianGenot/technical-test-lobster.git
 cd technical-test-lobster
+chmod +x setup.sh
+./setup.sh
+```
+
+### Option 2: Download the ZIP
+If you prefer not to use Git:
+1. Go to [https://github.com/KyllianGenot/technical-test-lobster](https://github.com/KyllianGenot/technical-test-lobster).
+2. Click the green "Code" button and select "Download ZIP".
+3. Extract the ZIP file to a folder of your choice.
+4. Open a terminal in that folder and run:
+```bash
 chmod +x setup.sh
 ./setup.sh
 ```
