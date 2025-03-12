@@ -47,21 +47,27 @@ RUST_LOG=info cargo run
 ```
 
 ## 📡 Using the Application
-To access the frontend or make API calls, open a new terminal window and either:
-- Make API calls directly: 
+After starting the application with `RUST_LOG=info cargo run`, you can:
+
+- **Access the built frontend**: Simply open your browser and navigate to:
+  ```
+  http://localhost:8080
+  ```
+  The frontend is automatically served by the backend server - no need to start it separately.
+
+- **Make API calls directly**: 
   ```bash
+  # Get all transfers
   curl http://localhost:8080/eth/transfers
+  
   # Filter by sender
   curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890"
+  
   # Filter by recipient
   curl "http://localhost:8080/eth/transfers?recipient=0xabcdef1234567890abcdef1234567890abcdef12"
+  
   # Filter by both
   curl "http://localhost:8080/eth/transfers?sender=0x1234567890123456789012345678901234567890&recipient=0xabcdef1234567890abcdef1234567890abcdef12"
-  ```
-- Start the frontend: 
-  ```bash
-  cd frontend/
-  npm start
   ```
 
 - **Repository**: [https://github.com/KyllianGenot/technical-test-lobster](https://github.com/KyllianGenot/technical-test-lobster)
